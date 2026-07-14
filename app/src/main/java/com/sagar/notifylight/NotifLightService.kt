@@ -5,8 +5,7 @@ import android.service.notification.StatusBarNotification
 
 class NotifLightService : NotificationListenerService() {
     private lateinit var flashHelper: FlashHelper
-    private var lastKey: String? = null
-    private var lastTime: Long = 0
+    private val lastTriggerByPackage = HashMap<String, Long>()
 
     override fun onCreate() {
         super.onCreate()
@@ -14,20 +13,22 @@ class NotifLightService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        // Ignore notifications from our own app (in case toggling the flash
-        // ever creates a system notification that could loop back to us)
+        // Ignore our own app and system UI
         if (sbn.packageName == packageName) return
         if (sbn.packageName == "com.android.systemui") return
 
+        // Ignore ongoing/persistent notifications (Termux status bar,
+        // music players, downloads, active calls, foreground services, etc.)
+        if (sbn.isOngoing) return
+
         val now = System.currentTimeMillis()
+        val last = lastTriggerByPackage[sbn.packageName] ?: 0L
 
-        // Ignore repeats of the exact same notification within 4 seconds
-        if (sbn.key == lastKey && (now - lastTime) < 4000) {
-            return
-        }
+        // Only allow one blink per app every 5 seconds, no matter how many
+        // notifications that app posts in that window
+        if (now - last < 5000) return
 
-        lastKey = sbn.key
-        lastTime = now
+        lastTriggerByPackage[sbn.packageName] = now
 
         if (flashHelper.hasFrontFlash()) {
             flashHelper.blink()
