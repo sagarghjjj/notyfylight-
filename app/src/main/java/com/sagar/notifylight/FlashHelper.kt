@@ -3,13 +3,11 @@ package com.sagar.notifylight
 import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
-import android.os.Build
 import java.util.concurrent.atomic.AtomicBoolean
 
 class FlashHelper(private val context: Context) {
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     private var frontFlashId: String? = null
-    private var maxStrengthLevel: Int = 1
     private val isBlinking = AtomicBoolean(false)
 
     init {
@@ -19,14 +17,13 @@ class FlashHelper(private val context: Context) {
             val hasFlash = chars.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) ?: false
             if (facing == CameraCharacteristics.LENS_FACING_FRONT && hasFlash) {
                 frontFlashId = id
-                if (Build.VERSION.SDK_INT >= 33) {
-                    maxStrengthLevel = chars.get(CameraCharacteristics.FLASH_INFO_STRENGTH_MAXIMUM_LEVEL) ?: 1
-                }
             }
         }
     }
 
-    fun supportsLowIntensity(): Boolean = Build.VERSION.SDK_INT >= 33 && maxStrengthLevel > 1
+    // Software dimming works on any device: pulse on/off very fast so the
+    // flash reads as dimmer to the eye instead of a full bright flash.
+    fun supportsLowIntensity(): Boolean = frontFlashId != null
 
     private fun isLowIntensityEnabled(): Boolean {
         val prefs = context.getSharedPreferences("notifylight_prefs", Context.MODE_PRIVATE)
@@ -37,18 +34,25 @@ class FlashHelper(private val context: Context) {
         val id = frontFlashId ?: return
         if (!isBlinking.compareAndSet(false, true)) return
 
-        val useLow = isLowIntensityEnabled() && supportsLowIntensity()
+        val useLow = isLowIntensityEnabled()
 
         Thread {
             try {
                 repeat(times) {
                     if (useLow) {
-                        cameraManager.turnOnTorchWithStrengthLevel(id, 1)
+                        // Rapidly pulse for the duration of "on" to simulate dimness
+                        val pulseEnd = System.currentTimeMillis() + onMs
+                        while (System.currentTimeMillis() < pulseEnd) {
+                            cameraManager.setTorchMode(id, true)
+                            Thread.sleep(15)
+                            cameraManager.setTorchMode(id, false)
+                            Thread.sleep(15)
+                        }
                     } else {
                         cameraManager.setTorchMode(id, true)
+                        Thread.sleep(onMs)
+                        cameraManager.setTorchMode(id, false)
                     }
-                    Thread.sleep(onMs)
-                    cameraManager.setTorchMode(id, false)
                     Thread.sleep(offMs)
                 }
             } finally {
