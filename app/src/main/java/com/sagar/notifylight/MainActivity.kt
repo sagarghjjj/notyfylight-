@@ -5,8 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import android.widget.Button
-import android.widget.Switch
-import android.widget.Toast
+import android.widget.RadioGroup
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -17,19 +16,23 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
         }
 
-        val flashHelper = FlashHelper(this)
         val prefs = getSharedPreferences("notifylight_prefs", Context.MODE_PRIVATE)
-        val lowIntensitySwitch = findViewById<Switch>(R.id.switchLowIntensity)
+        val radioGroup = findViewById<RadioGroup>(R.id.radioIntensity)
 
-        lowIntensitySwitch.isChecked = prefs.getBoolean("low_intensity", false)
-
-        if (!flashHelper.supportsLowIntensity()) {
-            lowIntensitySwitch.isEnabled = false
-            Toast.makeText(this, "Your device doesn't support adjustable flash brightness", Toast.LENGTH_LONG).show()
+        // Set initial selection based on saved preference
+        when (prefs.getString("intensity", "high")) {
+            "low" -> radioGroup.check(R.id.radioLow)
+            "mid" -> radioGroup.check(R.id.radioMid)
+            else -> radioGroup.check(R.id.radioHigh)
         }
 
-        lowIntensitySwitch.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("low_intensity", isChecked).apply()
+        radioGroup.setOnCheckedChangeListener { _, checkedId ->
+            val value = when (checkedId) {
+                R.id.radioLow -> "low"
+                R.id.radioMid -> "mid"
+                else -> "high"
+            }
+            prefs.edit().putString("intensity", value).apply()
         }
     }
 }

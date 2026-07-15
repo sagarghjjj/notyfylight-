@@ -20,10 +20,39 @@
         android:text="Enable Notification Access"
         android:layout_marginBottom="24dp" />
 
-    <Switch
-        android:id="@+id/switchLowIntensity"
+    <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Low Intensity Flash" />
+        android:text="Flash Intensity"
+        android:textSize="16sp"
+        android:layout_marginBottom="8dp" />
+
+    <RadioGroup
+        android:id="@+id/radioIntensity"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/radioLow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Low" />
+
+        <RadioButton
+            android:id="@+id/radioMid"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mid"
+            android:layout_marginStart="16dp" />
+
+        <RadioButton
+            android:id="@+id/radioHigh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="High"
+            android:layout_marginStart="16dp" />
+
+    </RadioGroup>
 
 </LinearLayout>

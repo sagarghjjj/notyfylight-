@@ -21,37 +21,31 @@ class FlashHelper(private val context: Context) {
         }
     }
 
-    // Software dimming works on any device: pulse on/off very fast so the
-    // flash reads as dimmer to the eye instead of a full bright flash.
-    fun supportsLowIntensity(): Boolean = frontFlashId != null
+    fun hasFrontFlash() = frontFlashId != null
 
-    private fun isLowIntensityEnabled(): Boolean {
+    private fun getIntensity(): String {
         val prefs = context.getSharedPreferences("notifylight_prefs", Context.MODE_PRIVATE)
-        return prefs.getBoolean("low_intensity", false)
+        return prefs.getString("intensity", "high") ?: "high"
     }
 
     fun blink(times: Int = 5, onMs: Long = 300, offMs: Long = 300) {
         val id = frontFlashId ?: return
         if (!isBlinking.compareAndSet(false, true)) return
 
-        val useLow = isLowIntensityEnabled()
+        val intensity = getIntensity()
 
         Thread {
             try {
                 repeat(times) {
-                    if (useLow) {
-                        // Rapidly pulse for the duration of "on" to simulate dimness
-                        val pulseEnd = System.currentTimeMillis() + onMs
-                        while (System.currentTimeMillis() < pulseEnd) {
+                    when (intensity) {
+                        "low" -> pulseFor(id, onMs, onTime = 8, offTime = 32)
+                        "mid" -> pulseFor(id, onMs, onTime = 18, offTime = 12)
+                        else -> {
+                            // High = full solid brightness
                             cameraManager.setTorchMode(id, true)
-                            Thread.sleep(15)
+                            Thread.sleep(onMs)
                             cameraManager.setTorchMode(id, false)
-                            Thread.sleep(15)
                         }
-                    } else {
-                        cameraManager.setTorchMode(id, true)
-                        Thread.sleep(onMs)
-                        cameraManager.setTorchMode(id, false)
                     }
                     Thread.sleep(offMs)
                 }
@@ -61,5 +55,13 @@ class FlashHelper(private val context: Context) {
         }.start()
     }
 
-    fun hasFrontFlash() = frontFlashId != null
+    private fun pulseFor(id: String, durationMs: Long, onTime: Long, offTime: Long) {
+        val end = System.currentTimeMillis() + durationMs
+        while (System.currentTimeMillis() < end) {
+            cameraManager.setTorchMode(id, true)
+            Thread.sleep(onTime)
+            cameraManager.setTorchMode(id, false)
+            Thread.sleep(offTime)
+        }
+    }
 }
