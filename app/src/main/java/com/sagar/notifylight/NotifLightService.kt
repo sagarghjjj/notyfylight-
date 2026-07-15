@@ -1,5 +1,6 @@
 package com.sagar.notifylight
 
+import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 
@@ -13,20 +14,20 @@ class NotifLightService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        // Ignore our own app and system UI
         if (sbn.packageName == packageName) return
         if (sbn.packageName == "com.android.systemui") return
 
-        // Ignore ongoing/persistent notifications (Termux status bar,
-        // music players, downloads, active calls, foreground services, etc.)
-        if (sbn.isOngoing) return
+        val isCall = sbn.notification.category == Notification.CATEGORY_CALL
+
+        // Block ongoing notifications UNLESS it's a phone call
+        if (sbn.isOngoing && !isCall) return
 
         val now = System.currentTimeMillis()
         val last = lastTriggerByPackage[sbn.packageName] ?: 0L
 
-        // Only allow one blink per app every 5 seconds, no matter how many
-        // notifications that app posts in that window
-        if (now - last < 5000) return
+        // Calls repeat every ~5s while ringing; other apps rate-limited too
+        val cooldown = if (isCall) 4000L else 5000L
+        if (now - last < cooldown) return
 
         lastTriggerByPackage[sbn.packageName] = now
 
