@@ -23,29 +23,27 @@ class FlashHelper(private val context: Context) {
 
     fun hasFrontFlash() = frontFlashId != null
 
-    private fun getIntensity(): String {
+    private fun getBrightness(): Int {
         val prefs = context.getSharedPreferences("notifylight_prefs", Context.MODE_PRIVATE)
-        return prefs.getString("intensity", "high") ?: "high"
+        return prefs.getInt("brightness", 100)
     }
 
     fun blink(times: Int = 5, onMs: Long = 300, offMs: Long = 300) {
         val id = frontFlashId ?: return
         if (!isBlinking.compareAndSet(false, true)) return
 
-        val intensity = getIntensity()
+        val brightness = getBrightness().coerceIn(1, 100)
 
         Thread {
             try {
                 repeat(times) {
-                    when (intensity) {
-                        "low" -> pulseFor(id, onMs, onTime = 8, offTime = 32)
-                        "mid" -> pulseFor(id, onMs, onTime = 18, offTime = 12)
-                        else -> {
-                            // High = full solid brightness
-                            cameraManager.setTorchMode(id, true)
-                            Thread.sleep(onMs)
-                            cameraManager.setTorchMode(id, false)
-                        }
+                    if (brightness >= 95) {
+                        // Near-max: just solid on, no pulsing needed
+                        cameraManager.setTorchMode(id, true)
+                        Thread.sleep(onMs)
+                        cameraManager.setTorchMode(id, false)
+                    } else {
+                        pulseFor(id, onMs, brightness)
                     }
                     Thread.sleep(offMs)
                 }
@@ -55,7 +53,13 @@ class FlashHelper(private val context: Context) {
         }.start()
     }
 
-    private fun pulseFor(id: String, durationMs: Long, onTime: Long, offTime: Long) {
+    // Simulates brightness by rapidly pulsing on/off with a duty cycle
+    // proportional to the brightness percentage.
+    private fun pulseFor(id: String, durationMs: Long, brightness: Int) {
+        val cycleMs = 40L
+        val onTime = ((brightness / 100.0) * cycleMs).toLong().coerceAtLeast(2)
+        val offTime = (cycleMs - onTime).coerceAtLeast(2)
+
         val end = System.currentTimeMillis() + durationMs
         while (System.currentTimeMillis() < end) {
             cameraManager.setTorchMode(id, true)

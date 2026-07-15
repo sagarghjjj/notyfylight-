@@ -5,7 +5,8 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import android.widget.Button
-import android.widget.RadioGroup
+import android.widget.SeekBar
+import android.widget.TextView
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -17,22 +18,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         val prefs = getSharedPreferences("notifylight_prefs", Context.MODE_PRIVATE)
-        val radioGroup = findViewById<RadioGroup>(R.id.radioIntensity)
+        val seekBar = findViewById<SeekBar>(R.id.seekBrightness)
+        val label = findViewById<TextView>(R.id.labelBrightness)
 
-        // Set initial selection based on saved preference
-        when (prefs.getString("intensity", "high")) {
-            "low" -> radioGroup.check(R.id.radioLow)
-            "mid" -> radioGroup.check(R.id.radioMid)
-            else -> radioGroup.check(R.id.radioHigh)
-        }
+        val saved = prefs.getInt("brightness", 100)
+        seekBar.progress = saved
+        label.text = "Brightness: $saved%"
 
-        radioGroup.setOnCheckedChangeListener { _, checkedId ->
-            val value = when (checkedId) {
-                R.id.radioLow -> "low"
-                R.id.radioMid -> "mid"
-                else -> "high"
+        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val value = progress.coerceAtLeast(1)
+                label.text = "Brightness: $value%"
+                prefs.edit().putInt("brightness", value).apply()
             }
-            prefs.edit().putString("intensity", value).apply()
-        }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
     }
 }
