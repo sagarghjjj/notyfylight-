@@ -9,9 +9,13 @@ import android.widget.SeekBar
 import android.widget.TextView
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var flashHelper: FlashHelper
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        flashHelper = FlashHelper(this)
 
         findViewById<Button>(R.id.btnEnable).setOnClickListener {
             startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
@@ -30,9 +34,21 @@ class MainActivity : AppCompatActivity() {
                 val value = progress.coerceAtLeast(1)
                 label.text = "Brightness: $value%"
                 prefs.edit().putInt("brightness", value).apply()
+
+                if (fromUser) {
+                    flashHelper.updatePreviewBrightness(value)
+                }
             }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                if (flashHelper.hasFrontFlash()) {
+                    flashHelper.startPreview(seekBar?.progress?.coerceAtLeast(1) ?: 100)
+                }
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                flashHelper.stopPreview()
+            }
         })
     }
 }

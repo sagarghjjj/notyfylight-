@@ -4,11 +4,15 @@ import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class FlashHelper(private val context: Context) {
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     private var frontFlashId: String? = null
     private val isBlinking = AtomicBoolean(false)
+
+    private val isPreviewing = AtomicBoolean(false)
+    private val previewBrightness = AtomicInteger(100)
 
     init {
         for (id in cameraManager.cameraIdList) {
@@ -28,6 +32,7 @@ class FlashHelper(private val context: Context) {
         return prefs.getInt("brightness", 100)
     }
 
+    // ---- Normal notification blink ----
     fun blink(times: Int = 5, onMs: Long = 300, offMs: Long = 300) {
         val id = frontFlashId ?: return
         if (!isBlinking.compareAndSet(false, true)) return
@@ -38,7 +43,6 @@ class FlashHelper(private val context: Context) {
             try {
                 repeat(times) {
                     if (brightness >= 95) {
-                        // Near-max: just solid on, no pulsing needed
                         cameraManager.setTorchMode(id, true)
                         Thread.sleep(onMs)
                         cameraManager.setTorchMode(id, false)
@@ -53,8 +57,6 @@ class FlashHelper(private val context: Context) {
         }.start()
     }
 
-    // Simulates brightness by rapidly pulsing on/off with a duty cycle
-    // proportional to the brightness percentage.
     private fun pulseFor(id: String, durationMs: Long, brightness: Int) {
         val cycleMs = 40L
         val onTime = ((brightness / 100.0) * cycleMs).toLong().coerceAtLeast(2)
@@ -67,5 +69,43 @@ class FlashHelper(private val context: Context) {
             cameraManager.setTorchMode(id, false)
             Thread.sleep(offTime)
         }
+    }
+
+    // ---- Live preview while dragging the slider ----
+    fun startPreview(initialBrightness: Int) {
+        val id = frontFlashId ?: return
+        previewBrightness.set(initialBrightness.coerceIn(1, 100))
+
+        if (!isPreviewing.compareAndSet(false, true)) return
+
+        Thread {
+            try {
+                while (isPreviewing.get()) {
+                    val brightness = previewBrightness.get()
+                    if (brightness >= 95) {
+                        cameraManager.setTorchMode(id, true)
+                        Thread.sleep(40)
+                    } else {
+                        val cycleMs = 40L
+                        val onTime = ((brightness / 100.0) * cycleMs).toLong().coerceAtLeast(2)
+                        val offTime = (cycleMs - onTime).coerceAtLeast(2)
+                        cameraManager.setTorchMode(id, true)
+                        Thread.sleep(onTime)
+                        cameraManager.setTorchMode(id, false)
+                        Thread.sleep(offTime)
+                    }
+                }
+            } finally {
+                cameraManager.setTorchMode(id, false)
+            }
+        }.start()
+    }
+
+    fun updatePreviewBrightness(brightness: Int) {
+        previewBrightness.set(brightness.coerceIn(1, 100))
+    }
+
+    fun stopPreview() {
+        isPreviewing.set(false)
     }
 }
